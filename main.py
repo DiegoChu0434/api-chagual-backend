@@ -66,27 +66,45 @@ def crear_control(data: Dict[str, Any], db: Session = Depends(obtener_db)):
         query = text("CALL insertar_control(:estado)")
         db.execute(query, {"estado": data.get("estado", "BORRADOR")})
         db.commit()
-        
         res = db.execute(text("SELECT LAST_INSERT_ID()"))
         new_id = res.scalar()
-        
         return {"message": "Control registrado correctamente", "id_control": new_id}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.get("/controles", response_model=List[RepuestaControl])
+def listar_controles(db: Session = Depends(obtener_db)):
+    result = db.execute(text("CALL listar_control()"))
+    return result.mappings().all()
+
 @app.put("/controles/{id_control}")
 def actualizar_control_estado(id_control: int, data: Dict[str, Any], db: Session = Depends(obtener_db)):
     try:
         query = text("CALL actualizar_control(:id, :estado)")  
-        db.execute(query, {
-            "id": id_control,
-            "estado": data.get("estado")
-        })
+        db.execute(query, {"id": id_control, "estado": data.get("estado")})
         db.commit()
-        return {"message": f"Estado actualizado a {data.get('estado')} exitosamente"}
+        return {"message": "Estado del control actualizado exitosamente"}
     except Exception as e:
         db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/controles/{id_control}")
+def eliminar_control(id_control: int, db: Session = Depends(obtener_db)):
+    try:
+        db.execute(text("CALL eliminar_control(:id)"), {"id": id_control})
+        db.commit()
+        return {"message": "Control eliminado correctamente"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    
+@app.get("/fichas")
+def listar_fichas(db: Session = Depends(obtener_db)):
+    try:
+        result = db.execute(text("CALL listar_ficha_chagual()"))
+        return result.mappings().all()
+    except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/fichas")
@@ -114,10 +132,41 @@ def crear_ficha(data: Dict[str, Any], db: Session = Depends(obtener_db)):
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/controles", response_model=List[RepuestaControl])
-def listar_controles(db: Session = Depends(obtener_db)):
-    result = db.execute(text("CALL listar_control()"))
-    return result.mappings().all()
+@app.put("/fichas/{id_ficha}")
+def actualizar_ficha(id_ficha: int, data: Dict[str, Any], db: Session = Depends(obtener_db)):
+    try:
+        data["p_id_ficha"] = id_ficha
+        query = text("""
+            CALL actualizar_ficha_chagual(
+                :p_id_ficha, :codigo, :telefono_contacto, :centro_poblado, :nombres_apellidos, :dni, :audio, 
+                :uso_area_afectada, :tenencia_edificacion, :total_ambientes, 
+                :anios_construccion, :agua_utilizada, :tiene_desague, 
+                :necesidades_fisiologicas, :tipo_alumbrado, :servicios_edificacion, 
+                :nivel_estudio, :centros_educativos, :tiempo_acceso, 
+                :sintomas_recientes, :centro_salud_cercano, 
+                :tiempo_demora_establecimiento, :atencion_enfermedad, 
+                :ocupacion_principal, :ocupacion_secundaria, :frecuencia_ingreso, 
+                :tipo_riego, :produccion_agricola, :produccion_pecuaria, 
+                :vende_cultivos, :latitud, :longitud, :altitud, 
+                :precision_gps, :registro_digital_dni
+            )
+        """)
+        db.execute(query, data)
+        db.commit()
+        return {"message": "Ficha actualizada correctamente"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/fichas/{id_ficha}")
+def eliminar_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
+    try:
+        db.execute(text("CALL eliminar_ficha_chagual(:id)"), {"id": id_ficha})
+        db.commit()
+        return {"message": "Ficha eliminada correctamente"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/fotos")
 def crear_foto(data: Dict[str, Any], db: Session = Depends(obtener_db)):
@@ -139,3 +188,29 @@ def crear_foto(data: Dict[str, Any], db: Session = Depends(obtener_db)):
 def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
     result = db.execute(text("CALL listar_ficha_foto(:id_ficha)"), {"id_ficha": id_ficha})
     return result.mappings().all()
+
+@app.put("/fotos/{id_foto}")
+def actualizar_foto(id_foto: int, data: Dict[str, Any], db: Session = Depends(obtener_db)):
+    try:
+        query = text("CALL actualizar_ficha_foto(:id, :url, :tipo, :origen)")
+        db.execute(query, {
+            "id": id_foto,
+            "url": data.get("url_foto"),
+            "tipo": data.get("tipo_foto"),
+            "origen": data.get("origen")
+        })
+        db.commit()
+        return {"message": "Foto actualizada correctamente"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/fotos/{id_foto}")
+def eliminar_foto(id_foto: int, db: Session = Depends(obtener_db)):
+    try:
+        db.execute(text("CALL eliminar_ficha_foto(:id)"), {"id": id_foto})
+        db.commit()
+        return {"message": "Foto eliminada correctamente"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
