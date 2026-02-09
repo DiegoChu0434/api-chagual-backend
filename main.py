@@ -1,13 +1,22 @@
 import decimal
 import os
+import io
+import base64
+import json
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+from google.oauth2 import service_account
+from dotenv import load_dotenv
+
 
 URL_DATABASE = os.getenv("DATABASE_URL")
+DRIVE_FOLDER_ID = os.getenv("DRIVE_FOLDER_ID")
 
 engine = create_engine(
     URL_DATABASE,
@@ -34,6 +43,30 @@ def obtener_db():
         yield db
     finally:
         db.close()
+
+def obtener_servicio_drive():
+    info_json = os.getenv("GOOGLE_SERVICE")
+    if info_json:
+        info = json.loads(info_json)
+        creds = service_account.Credentials.from_service_account_info(info)
+    else:
+        creds = service_account.Credentials.from_service_account_file("GOOGLE_SERVICE")
+    return build('drive', 'v3', credentials=creds)
+
+def subir_a_drive(nombre_archivo, contenido_base64):
+    try:
+        service = obtener_servicio_drive()
+        imagen_data = base64.b64decode(contenido_base64)
+        fh = io.BytesIO(imagen_data)
+        metadata = {
+            'name': nombre_archivo,
+            'parents': [DRIVE_FOLDER_ID]
+        }
+        media = MediaIoBaseUpload(fh, mimetype='image/jpeg', resumable=True)
+        file = service.files().create(body=metadata, media_body=media, fields='id, webViewLink').execute()
+        return file.get('webViewLink')
+    except Exception as e:
+        raise Exception(f"Error en Drive: {str(e)}")
 
 class RepuestaControl(BaseModel):
     id_control: int
@@ -127,7 +160,10 @@ def crear_ficha(data: Dict[str, Any], db: Session = Depends(obtener_db)):
         """)
         db.execute(query, data)
         db.commit()
-        return {"message": "Datos de la ficha sincronizados correctamente"}
+        res = db.execute(text("SELECT LAST_INSERT_ID()"))
+        nuevo_id_ficha = res.scalar()
+
+        return {"message": "Datos de la ficha sincronizados correctamente", "id_ficha": nuevo_id_ficha}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -171,15 +207,31 @@ def eliminar_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
 @app.post("/fotos")
 def crear_foto(data: Dict[str, Any], db: Session = Depends(obtener_db)):
     try:
-        query = text("CALL insertar_ficha_foto(:id_ficha, :url_foto, :tipo_foto, :origen)")
-        db.execute(query, {
-            "id_ficha": data.get("id_ficha"),
-            "url_foto": data.get("url_foto"),
+        codigo_ficha = data.get("codigo_ficha", "SIN_CODIGO")
+        id_ficha = data.get("id_ficha")
+        query_contar = text("SELECT COUNT(*) FROM ficha_fotos WHERE id_ficha = :id_ficha")
+        resultado = db.execute(query_contar, {"id_ficha": id_ficha})
+        total_fotos = resultado.scalar()
+        correlativo = total_fotos + 1
+
+        nombre_archivo_drive = f"{codigo_ficha}-{correlativo}.jpg"
+        url_drive = subir_a_drive(
+            nombre_archivo=nombre_archivo_drive,
+            contenido_base64=data.get("archivo_base64")
+        )
+        query_insert = text("CALL insertar_ficha_foto(:id_ficha, :url_foto, :tipo_foto, :origen)")
+        db.execute(query_insert, {
+            "id_ficha": id_ficha,
+            "url_foto": url_drive,
             "tipo_foto": data.get("tipo_foto", ""),
             "origen": data.get("origen", "")
         })
         db.commit()
-        return {"message": "Foto vinculada correctamente"}
+
+        return {
+            "message": f"Foto {nombre_archivo_drive} guardada correctamente", 
+            "url": url_drive
+        }
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -213,4 +265,35 @@ def eliminar_foto(id_foto: int, db: Session = Depends(obtener_db)):
         return {"message": "Foto eliminada correctamente"}
     except Exception as e:
         db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    
+@app.post("/audios")
+def subir_audio_ficha(data: Dict[str, Any], db: Session = Depends(obtener_db)):
+    try:
+        id_ficha = data.get("id_ficha")
+        codigo_ficha = data.get("codigo_ficha", "F") 
+        nombre_archivo = f"audio_{codigo_ficha}_{os.urandom(2).hex()}.mp3"
+        url_drive = subir_a_drive(
+            nombre_archivo=nombre_archivo,
+            contenido_base64=data.get("archivo_base64")
+        )
+        query = text("UPDATE ficha_chagual SET audio = :url WHERE id_ficha = :id")
+        db.execute(query, {"url": url_drive, "id": id_ficha})
+        db.commit()
+
+        return {"message": "Audio subido y vinculado", "url": url_drive}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/audios/{id_ficha}")
+def obtener_audio_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
+    try:
+        query = text("SELECT audio FROM ficha_chagual WHERE id_ficha = :id")
+        result = db.execute(query, {"id": id_ficha}).fetchone()
+        
+        if result and result[0]:
+            return {"id_ficha": id_ficha, "url_audio": result[0]}
+        raise HTTPException(status_code=404, detail="No se encontró audio para esta ficha")
+    except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
