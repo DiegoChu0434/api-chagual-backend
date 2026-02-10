@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from google.oauth2 import service_account
-from dotenv import load_dotenv
+
 
 
 URL_DATABASE = os.getenv("DATABASE_URL")
@@ -58,16 +58,25 @@ def subir_a_drive(nombre_archivo, contenido_base64):
         service = obtener_servicio_drive()
         imagen_data = base64.b64decode(contenido_base64)
         fh = io.BytesIO(imagen_data)
+        
         metadata = {
             'name': nombre_archivo,
             'parents': [DRIVE_FOLDER_ID]
         }
+        
         media = MediaIoBaseUpload(fh, mimetype='image/jpeg', resumable=True)
-        file = service.files().create(body=metadata, media_body=media, fields='id, webViewLink').execute()
+        
+        file = service.files().create(
+            body=metadata, 
+            media_body=media, 
+            fields='id, webViewLink',
+            supportsAllDrives=True  
+        ).execute()
+        
         return file.get('webViewLink')
     except Exception as e:
         raise Exception(f"Error en Drive: {str(e)}")
-
+    
 class RepuestaControl(BaseModel):
     id_control: int
     estado: str
