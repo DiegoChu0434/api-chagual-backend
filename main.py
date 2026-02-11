@@ -232,12 +232,12 @@ def crear_foto(data: Dict[str, Any], db: Session = Depends(obtener_db)):
         # ------------------------------------------------------
 
 
-        valor_a_guardar = archivo_base64 if archivo_base64 else "sin_archivo"
+
 
         query_insert = text("CALL insertar_ficha_foto(:id_ficha, :url_foto, :tipo_foto, :origen)")
         db.execute(query_insert, {
             "id_ficha": id_ficha,
-            "url_foto": valor_a_guardar, 
+            "url_foto": None,
             "tipo_foto": data.get("tipo_foto", ""),
             "origen": data.get("origen", "")
         })
