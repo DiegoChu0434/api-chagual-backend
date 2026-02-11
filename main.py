@@ -232,12 +232,12 @@ def crear_foto(data: Dict[str, Any], db: Session = Depends(obtener_db)):
         # ------------------------------------------------------
 
 
-
+        url_prueba = "http://localhost/foto_prueba.jpg"
 
         query_insert = text("CALL insertar_ficha_foto(:id_ficha, :url_foto, :tipo_foto, :origen)")
         db.execute(query_insert, {
             "id_ficha": id_ficha,
-            "url_foto": None,
+            "url_foto": url_prueba,
             "tipo_foto": data.get("tipo_foto", ""),
             "origen": data.get("origen", "")
         })
