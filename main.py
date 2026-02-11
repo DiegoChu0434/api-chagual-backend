@@ -222,12 +222,12 @@ def crear_foto(data: Dict[str, Any], db: Session = Depends(obtener_db)):
         resultado = db.execute(query_contar, {"id_ficha": id_ficha})
         total_fotos = resultado.scalar()
         correlativo = total_fotos + 1
-
-        nombre_archivo_drive = f"{codigo_ficha}-{correlativo}.jpg"
-        url_drive = subir_a_drive(
-            nombre_archivo=nombre_archivo_drive,
-            contenido_base64=data.get("archivo_base64")
-        )
+        
+        #nombre_archivo_drive = f"{codigo_ficha}-{correlativo}.jpg"
+        #url_drive = subir_a_drive(
+         #   nombre_archivo=nombre_archivo_drive,
+          #  contenido_base64=data.get("archivo_base64")
+        #)
         query_insert = text("CALL insertar_ficha_foto(:id_ficha, :url_foto, :tipo_foto, :origen)")
         db.execute(query_insert, {
             "id_ficha": id_ficha,
