@@ -212,38 +212,47 @@ def eliminar_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-
+    
 @app.post("/fotos")
 def crear_foto(data: Dict[str, Any], db: Session = Depends(obtener_db)):
     try:
         codigo_ficha = data.get("codigo_ficha", "SIN_CODIGO")
         id_ficha = data.get("id_ficha")
+        archivo_base64 = data.get("archivo_base64") 
         query_contar = text("SELECT COUNT(*) FROM ficha_fotos WHERE id_ficha = :id_ficha")
         resultado = db.execute(query_contar, {"id_ficha": id_ficha})
         total_fotos = resultado.scalar()
         correlativo = total_fotos + 1
         
-        #nombre_archivo_drive = f"{codigo_ficha}-{correlativo}.jpg"
-        #url_drive = subir_a_drive(
-         #   nombre_archivo=nombre_archivo_drive,
-          #  contenido_base64=data.get("archivo_base64")
-        #)
+        # nombre_archivo_drive = f"{codigo_ficha}-{correlativo}.jpg"
+        # url_drive = subir_a_drive(
+        #     nombre_archivo=nombre_archivo_drive,
+        #     contenido_base64=archivo_base64
+        # )
+        # ------------------------------------------------------
+
+
+        valor_a_guardar = archivo_base64 if archivo_base64 else "sin_archivo"
+
         query_insert = text("CALL insertar_ficha_foto(:id_ficha, :url_foto, :tipo_foto, :origen)")
         db.execute(query_insert, {
             "id_ficha": id_ficha,
-            "url_foto": url_drive,
+            "url_foto": valor_a_guardar, 
             "tipo_foto": data.get("tipo_foto", ""),
             "origen": data.get("origen", "")
         })
+        
         db.commit()
 
         return {
-            "message": f"Foto {nombre_archivo_drive} guardada correctamente", 
-            "url": url_drive
+            "message": "Foto registrada en la base de datos correctamente",
+            "correlativo": correlativo,
+            "id_ficha": id_ficha
         }
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.get("/fotos/{id_ficha}", response_model=List[RespuestaFoto])
 def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
@@ -306,3 +315,8 @@ def obtener_audio_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
         raise HTTPException(status_code=404, detail="No se encontró audio para esta ficha")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+
+
+
+    
