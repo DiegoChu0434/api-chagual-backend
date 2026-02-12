@@ -4,6 +4,7 @@ import io
 import base64
 import json
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi import File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
@@ -286,15 +287,23 @@ def eliminar_foto(id_foto: int, db: Session = Depends(obtener_db)):
         raise HTTPException(status_code=400, detail=str(e))
     
 @app.post("/audios")
-def subir_audio_ficha(data: Dict[str, Any], db: Session = Depends(obtener_db)):
+async def subir_audio_ficha(
+    id_ficha: int = Form(...), 
+    file: UploadFile = File(...), 
+    db: Session = Depends(obtener_db)
+):
     try:
-        id_ficha = data.get("id_ficha")
-        codigo_ficha = data.get("codigo_ficha", "F") 
-        nombre_archivo = f"audio_{codigo_ficha}_{os.urandom(2).hex()}.mp3"
+        contenido = await file.read()
+
+        contenido_base64 = base64.b64encode(contenido).decode('utf-8')
+        
+        nombre_archivo = f"audio_ficha_{id_ficha}_{os.urandom(2).hex()}.mp3"
+        
         url_drive = subir_a_drive(
             nombre_archivo=nombre_archivo,
-            contenido_base64=data.get("archivo_base64")
+            contenido_base64=contenido_base64
         )
+        
         query = text("UPDATE ficha_chagual SET audio = :url WHERE id_ficha = :id")
         db.execute(query, {"url": url_drive, "id": id_ficha})
         db.commit()
