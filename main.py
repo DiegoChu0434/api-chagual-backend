@@ -289,32 +289,36 @@ def eliminar_foto(id_foto: int, db: Session = Depends(obtener_db)):
 @app.post("/audios")
 async def subir_audio_ficha(
     id_ficha: int = Form(...), 
-    file: UploadFile = File(...), 
+    file: UploadFile = File(None), 
     db: Session = Depends(obtener_db)
 ):
     try:
-        contenido_binario = await file.read()
+        if file is None:
+            query = text("UPDATE ficha_chagual SET audio = '' WHERE id_ficha = :id")
+            db.execute(query, {"id": id_ficha})
+            db.commit()
+            return {"message": "Audio actualizado a vacio"}
 
-        if not contenido_binario:
-            raise HTTPException(status_code=400, detail="El archivo está vacío")
+        contenido_binario = await file.read()
+        
+        if len(contenido_binario) == 0:
+            query = text("UPDATE ficha_chagual SET audio = '' WHERE id_ficha = :id")
+            db.execute(query, {"id": id_ficha})
+            db.commit()
+            return {"message": "Contenido vacio detectado y guardado"}
 
         query = text("UPDATE ficha_chagual SET audio = :contenido WHERE id_ficha = :id")
-        
-        db.execute(query, {
-            "contenido": contenido_binario, 
-            "id": id_ficha
-        })
+        db.execute(query, {"contenido": contenido_binario, "id": id_ficha})
         db.commit()
 
         return {
-            "message": "Audio guardado localmente en la base de datos", 
+            "status": "success",
             "id_ficha": id_ficha,
-            "tamaño": len(contenido_binario)
+            "bytes": len(contenido_binario)
         }
     except Exception as e:
         db.rollback()
-        print(f"Error al guardar audio: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Error interno: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/audios/{id_ficha}")
 def obtener_audio_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
