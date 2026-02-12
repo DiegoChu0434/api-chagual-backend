@@ -293,25 +293,28 @@ async def subir_audio_ficha(
     db: Session = Depends(obtener_db)
 ):
     try:
-        contenido = await file.read()
+        contenido_binario = await file.read()
 
-        contenido_base64 = base64.b64encode(contenido).decode('utf-8')
+        if not contenido_binario:
+            raise HTTPException(status_code=400, detail="El archivo está vacío")
+
+        query = text("UPDATE ficha_chagual SET audio = :contenido WHERE id_ficha = :id")
         
-        nombre_archivo = f"audio_ficha_{id_ficha}_{os.urandom(2).hex()}.mp3"
-        
-        url_drive = subir_a_drive(
-            nombre_archivo=nombre_archivo,
-            contenido_base64=contenido_base64
-        )
-        
-        query = text("UPDATE ficha_chagual SET audio = :url WHERE id_ficha = :id")
-        db.execute(query, {"url": url_drive, "id": id_ficha})
+        db.execute(query, {
+            "contenido": contenido_binario, 
+            "id": id_ficha
+        })
         db.commit()
 
-        return {"message": "Audio subido y vinculado", "url": url_drive}
+        return {
+            "message": "Audio guardado localmente en la base de datos", 
+            "id_ficha": id_ficha,
+            "tamaño": len(contenido_binario)
+        }
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Error al guardar audio: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error interno: {str(e)}")
 
 @app.get("/audios/{id_ficha}")
 def obtener_audio_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
