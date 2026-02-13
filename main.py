@@ -221,17 +221,13 @@ def eliminar_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
         raise HTTPException(status_code=400, detail=str(e))
     
 @app.post("/fotos")
-def crear_foto(data: Dict[str, Any], db: Session = Depends(obtener_db)):
+async def crear_foto(
+    id_ficha: int = Form(...), 
+    file: UploadFile = File(...), 
+    db: Session = Depends(obtener_db)
+):
     try:
-        id_ficha = data.get("id_ficha")
-        archivo_b64 = data.get("archivo_base64")
-
-        if not archivo_b64:
-            raise HTTPException(status_code=400, detail="No se recibió la imagen en base64")
-        if "," in archivo_b64:
-            archivo_b64 = archivo_b64.split(",")[1]
-        
-        contenido_binario = base64.b64decode(archivo_b64)
+        contenido_binario = await file.read()
         query_insert = text("CALL insertar_ficha_foto(:id_ficha, :archivo)")
         db.execute(query_insert, {
             "id_ficha": id_ficha,
@@ -239,14 +235,10 @@ def crear_foto(data: Dict[str, Any], db: Session = Depends(obtener_db)):
         })
         
         db.commit()
-
-        return {
-            "message": "Foto guardada exitosamente en la base de datos",
-            "id_ficha": id_ficha
-        }
+        return {"message": "Foto guardada", "id_ficha": id_ficha}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/fotos/{id_ficha}", response_model=List[RespuestaFoto])
