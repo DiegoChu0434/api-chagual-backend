@@ -223,37 +223,25 @@ def eliminar_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
 @app.post("/fotos")
 def crear_foto(data: Dict[str, Any], db: Session = Depends(obtener_db)):
     try:
-        codigo_ficha = data.get("codigo_ficha", "SIN_CODIGO")
         id_ficha = data.get("id_ficha")
-        archivo_base64 = data.get("archivo_base64") 
-        query_contar = text("SELECT COUNT(*) FROM ficha_fotos WHERE id_ficha = :id_ficha")
-        resultado = db.execute(query_contar, {"id_ficha": id_ficha})
-        total_fotos = resultado.scalar()
-        correlativo = total_fotos + 1
+        archivo_b64 = data.get("archivo_base64")
+
+        if not archivo_b64:
+            raise HTTPException(status_code=400, detail="No se recibió la imagen en base64")
+        if "," in archivo_b64:
+            archivo_b64 = archivo_b64.split(",")[1]
         
-        # nombre_archivo_drive = f"{codigo_ficha}-{correlativo}.jpg"
-        # url_drive = subir_a_drive(
-        #     nombre_archivo=nombre_archivo_drive,
-        #     contenido_base64=archivo_base64
-        # )
-        # ------------------------------------------------------
-
-
-        url_prueba = "http://localhost/foto_prueba.jpg"
-
-        query_insert = text("CALL insertar_ficha_foto(:id_ficha, :url_foto, :tipo_foto, :origen)")
+        contenido_binario = base64.b64decode(archivo_b64)
+        query_insert = text("CALL insertar_ficha_foto(:id_ficha, :archivo)")
         db.execute(query_insert, {
             "id_ficha": id_ficha,
-            "url_foto": url_prueba,
-            "tipo_foto": data.get("tipo_foto", ""),
-            "origen": data.get("origen", "")
+            "archivo": contenido_binario
         })
         
         db.commit()
 
         return {
-            "message": "Foto registrada en la base de datos correctamente",
-            "correlativo": correlativo,
+            "message": "Foto guardada exitosamente en la base de datos",
             "id_ficha": id_ficha
         }
     except Exception as e:
@@ -263,18 +251,24 @@ def crear_foto(data: Dict[str, Any], db: Session = Depends(obtener_db)):
 
 @app.get("/fotos/{id_ficha}", response_model=List[RespuestaFoto])
 def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
-    result = db.execute(text("CALL listar_ficha_foto(:id_ficha)"), {"id_ficha": id_ficha})
-    return result.mappings().all()
+    result = db.execute(text("CALL listar_ficha_foto(:id_ficha)"), {"id_ficha": id_ficha}).mappings().all()
+    
+    fotos_procesadas = []
+    for row in result:
+        foto_dict = dict(row)
+        if foto_dict.get("url_foto"):
+            foto_dict["url_foto"] = base64.b64encode(foto_dict["url_foto"]).decode('utf-8')
+        fotos_procesadas.append(foto_dict)
+        
+    return fotos_procesadas
 
 @app.put("/fotos/{id_foto}")
 def actualizar_foto(id_foto: int, data: Dict[str, Any], db: Session = Depends(obtener_db)):
     try:
-        query = text("CALL actualizar_ficha_foto(:id, :url, :tipo, :origen)")
+        query = text("CALL actualizar_ficha_foto(:id, :url)")
         db.execute(query, {
             "id": id_foto,
-            "url": data.get("url_foto"),
-            "tipo": data.get("tipo_foto"),
-            "origen": data.get("origen")
+            "url": data.get("url_foto")
         })
         db.commit()
         return {"message": "Foto actualizada correctamente"}
