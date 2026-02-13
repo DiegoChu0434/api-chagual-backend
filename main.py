@@ -5,6 +5,7 @@ import base64
 import json
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi import File, UploadFile, Form
+from fastapi import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
@@ -243,16 +244,21 @@ async def crear_foto(
 
 @app.get("/fotos/{id_ficha}", response_model=List[RespuestaFoto])
 def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
-    result = db.execute(text("CALL listar_ficha_foto(:id_ficha)"), {"id_ficha": id_ficha}).mappings().all()
-    
-    fotos_procesadas = []
-    for row in result:
-        foto_dict = dict(row)
-        if foto_dict.get("url_foto"):
-            foto_dict["url_foto"] = base64.b64encode(foto_dict["url_foto"]).decode('utf-8')
-        fotos_procesadas.append(foto_dict)
+    try:
+        result = db.execute(text("CALL listar_ficha_foto(:id_ficha)"), {"id_ficha": id_ficha}).mappings().all()
         
-    return fotos_procesadas
+        fotos_procesadas = []
+        for row in result:
+            foto_dict = dict(row)
+            if foto_dict.get("url_foto"):
+                foto_dict["url_foto"] = base64.b64encode(foto_dict["url_foto"]).decode('utf-8')
+            
+            fotos_procesadas.append(foto_dict)
+            
+        return fotos_procesadas
+    except Exception as e:
+        print(f"Error en GET fotos: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/fotos/{id_foto}")
 def actualizar_foto(id_foto: int, data: Dict[str, Any], db: Session = Depends(obtener_db)):
@@ -314,11 +320,11 @@ def obtener_audio_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
         result = db.execute(query, {"id": id_ficha}).fetchone()
         
         if result and result[0]:
-            return {"id_ficha": id_ficha, "url_audio": result[0]}
-        raise HTTPException(status_code=404, detail="No se encontró audio para esta ficha")
+            return Response(content=result[0], media_type="audio/webm") 
+            
+        raise HTTPException(status_code=404, detail="No se encontró audio")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 
