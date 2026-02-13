@@ -142,13 +142,19 @@ def eliminar_control(id_control: int, db: Session = Depends(obtener_db)):
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     
+import base64
+
 @app.get("/fichas")
 def listar_fichas(db: Session = Depends(obtener_db)):
-    try:
-        result = db.execute(text("CALL listar_ficha_chagual()"))
-        return result.mappings().all()
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    result = db.execute(text("CALL listar_ficha_chagual()")).mappings().all()
+    fichas = []
+    for row in result:
+        ficha = dict(row)
+        if ficha.get("audio"):
+            ficha["audio"] = base64.b64encode(ficha["audio"]).decode('utf-8')
+        fichas.append(ficha)
+    
+    return fichas
 
 @app.post("/fichas")
 def crear_ficha(data: Dict[str, Any], db: Session = Depends(obtener_db)):
@@ -294,18 +300,12 @@ async def subir_audio_ficha(
 ):
     try:
         if file is None:
-            query = text("UPDATE ficha_chagual SET audio = '' WHERE id_ficha = :id")
-            db.execute(query, {"id": id_ficha})
-            db.commit()
-            return {"message": "Audio actualizado a vacio"}
+            return {"message": "No se proporcionó archivo"}
 
         contenido_binario = await file.read()
-        
+
         if len(contenido_binario) == 0:
-            query = text("UPDATE ficha_chagual SET audio = '' WHERE id_ficha = :id")
-            db.execute(query, {"id": id_ficha})
-            db.commit()
-            return {"message": "Contenido vacio detectado y guardado"}
+            return {"message": "El archivo está vacío"}
 
         query = text("UPDATE ficha_chagual SET audio = :contenido WHERE id_ficha = :id")
         db.execute(query, {"contenido": contenido_binario, "id": id_ficha})
@@ -313,6 +313,7 @@ async def subir_audio_ficha(
 
         return {
             "status": "success",
+            "message": "Audio guardado en la base de datos", 
             "id_ficha": id_ficha,
             "bytes": len(contenido_binario)
         }
