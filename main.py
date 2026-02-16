@@ -95,8 +95,6 @@ class RespuestaFoto(BaseModel):
     id_foto: int
     id_ficha: int
     url_foto: str
-    tipo_foto: Optional[str]
-    origen: Optional[str]
     fecha_subida: Any
     model_config = ConfigDict(from_attributes=True)
 
@@ -248,13 +246,14 @@ def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
             text("CALL listar_ficha_foto(:id_ficha)"), 
             {"id_ficha": id_ficha}
         )
+        
         rows = result_proxy.fetchall()
         columnas = result_proxy.keys()
         
         fotos_procesadas = []
         for row in rows:
             foto_dict = dict(zip(columnas, row))
-            archivo_binario = foto_dict.get("url_foto") or row[2] 
+            archivo_binario = foto_dict.get("url_foto")
             
             if isinstance(archivo_binario, (bytes, bytearray)):
                 foto_dict["url_foto"] = base64.b64encode(archivo_binario).decode('utf-8')
@@ -266,11 +265,8 @@ def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
         return fotos_procesadas
     except Exception as e:
         error_db = str(e.__dict__.get('orig', e))
-        print(f"DEBUG ERROR DETALLADO: {error_db}") 
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error en base de datos: {error_db}"
-        )
+        print(f"DEBUG: {error_db}")
+        raise HTTPException(status_code=500, detail=f"Error: {error_db}")
 
 @app.put("/fotos/{id_foto}")
 def actualizar_foto(id_foto: int, data: Dict[str, Any], db: Session = Depends(obtener_db)):
