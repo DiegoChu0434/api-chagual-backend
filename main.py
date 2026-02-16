@@ -241,7 +241,6 @@ async def crear_foto(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/fotos/{id_ficha}", response_model=List[RespuestaFoto])
 def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
     try:
@@ -255,7 +254,6 @@ def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
         fotos_procesadas = []
         for row in rows:
             foto_dict = dict(zip(columnas, row))
-            
             archivo_binario = foto_dict.get("url_foto") or row[2] 
             
             if isinstance(archivo_binario, (bytes, bytearray)):
@@ -267,8 +265,12 @@ def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
             
         return fotos_procesadas
     except Exception as e:
-        print(f"DEBUG ERROR DETALLADO: {str(e)}") 
-        raise HTTPException(status_code=500, detail=f"Error en el servidor: {str(e)}")
+        error_db = str(e.__dict__.get('orig', e))
+        print(f"DEBUG ERROR DETALLADO: {error_db}") 
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error en base de datos: {error_db}"
+        )
 
 @app.put("/fotos/{id_foto}")
 def actualizar_foto(id_foto: int, data: Dict[str, Any], db: Session = Depends(obtener_db)):
