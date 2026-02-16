@@ -253,18 +253,19 @@ def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
         fotos_procesadas = []
         for row in result:
             foto_dict = dict(row)
-            archivo_binario = foto_dict.get("url_foto")
+            archivo_binario = foto_dict.get("url_foto") 
             
-            if archivo_binario and isinstance(archivo_binario, (bytes, bytearray)):
+            if isinstance(archivo_binario, (bytes, bytearray)):
                 foto_dict["url_foto"] = base64.b64encode(archivo_binario).decode('utf-8')
-            elif archivo_binario is None:
-                foto_dict["url_foto"] = "" 
+            else:
+                foto_dict["url_foto"] = str(archivo_binario) if archivo_binario else ""
+                
             fotos_procesadas.append(foto_dict)
             
         return fotos_procesadas
     except Exception as e:
-        print(f"Error procesando fotos: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error al procesar imágenes: {str(e)}")
+        print(f"DEBUG ERROR: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 @app.put("/fotos/{id_foto}")
 def actualizar_foto(id_foto: int, data: Dict[str, Any], db: Session = Depends(obtener_db)):
