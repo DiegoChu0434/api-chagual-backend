@@ -253,12 +253,12 @@ def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
         fotos_procesadas = []
         for row in result:
             foto_dict = dict(row)
-            archivo_binario = foto_dict.get("url_foto") 
+            archivo_binario = foto_dict.get("archivo") 
             
             if isinstance(archivo_binario, (bytes, bytearray)):
                 foto_dict["url_foto"] = base64.b64encode(archivo_binario).decode('utf-8')
             else:
-                foto_dict["url_foto"] = str(archivo_binario) if archivo_binario else ""
+                foto_dict["url_foto"] = ""
                 
             fotos_procesadas.append(foto_dict)
             
