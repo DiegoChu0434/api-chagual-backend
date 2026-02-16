@@ -245,15 +245,18 @@ async def crear_foto(
 @app.get("/fotos/{id_ficha}", response_model=List[RespuestaFoto])
 def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
     try:
-        result = db.execute(
+        result_proxy = db.execute(
             text("CALL listar_ficha_foto(:id_ficha)"), 
             {"id_ficha": id_ficha}
-        ).mappings().all()
+        )
+        rows = result_proxy.fetchall()
+        columnas = result_proxy.keys()
         
         fotos_procesadas = []
-        for row in result:
-            foto_dict = dict(row)
-            archivo_binario = foto_dict.get("url_foto") 
+        for row in rows:
+            foto_dict = dict(zip(columnas, row))
+            
+            archivo_binario = foto_dict.get("url_foto") or row[2] 
             
             if isinstance(archivo_binario, (bytes, bytearray)):
                 foto_dict["url_foto"] = base64.b64encode(archivo_binario).decode('utf-8')
@@ -264,8 +267,8 @@ def listar_fotos_por_ficha(id_ficha: int, db: Session = Depends(obtener_db)):
             
         return fotos_procesadas
     except Exception as e:
-        print(f"DEBUG ERROR: {str(e)}") 
-        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+        print(f"DEBUG ERROR DETALLADO: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error en el servidor: {str(e)}")
 
 @app.put("/fotos/{id_foto}")
 def actualizar_foto(id_foto: int, data: Dict[str, Any], db: Session = Depends(obtener_db)):
