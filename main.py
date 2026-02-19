@@ -3,61 +3,6 @@ import os
 import io
 import base64
 import json
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi import File, UploadFile, Form
-from fastapi import Response
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, ConfigDict
-from typing import List, Optional, Dict, Any
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, Session
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
-from google.oauth2 import service_account
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
-
-
-
-URL_DATABASE = os.getenv("DATABASE_URL")
-DRIVE_FOLDER_ID = os.getenv("DRIVE_FOLDER_ID")
-
-engine = create_engine(
-    URL_DATABASE,
-    pool_recycle=3600,
-    pool_pre_ping=True,
-    isolation_level="READ COMMITTED"
-)
-
-SesionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-app = FastAPI(title="API FICHA CHAGUAL")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-def obtener_db():
-    db = SesionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-¡Excelente! Ya tienes la "llave maestra". Ahora que has configurada tu cuenta personal como el motor de subida, la API usará tus 2TB y el error de cuota desaparecerá.
-
-Aquí tienes el código final integrado que debes desplegar en Render. He actualizado la función obtener_servicio_drive para que use este nuevo formato y he pulido el endpoint de fotos.
-
-Python
-import decimal
-import os
-import io
-import base64
-import json
 from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict
