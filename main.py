@@ -55,18 +55,17 @@ def obtener_servicio_drive():
         creds = service_account.Credentials.from_service_account_file("GOOGLE_SERVICE")
     return build('drive', 'v3', credentials=creds)
 
-def subir_a_drive(nombre_archivo, contenido_base64):
+def subir_a_drive(nombre_archivo, contenido_binario, content_type='image/jpeg'):
     try:
         service = obtener_servicio_drive()
-        imagen_data = base64.b64decode(contenido_base64)
-        fh = io.BytesIO(imagen_data)
+        fh = io.BytesIO(contenido_binario)
         
         metadata = {
             'name': nombre_archivo,
             'parents': [DRIVE_FOLDER_ID]
         }
         
-        media = MediaIoBaseUpload(fh, mimetype='image/jpeg', resumable=True)
+        media = MediaIoBaseUpload(fh, mimetype=content_type, resumable=True)
         
         file = service.files().create(
             body=metadata, 
@@ -227,14 +226,22 @@ async def crear_foto(
 ):
     try:
         contenido_binario = await file.read()
+        
         query_insert = text("CALL insertar_ficha_foto(:id_ficha, :archivo)")
         db.execute(query_insert, {
             "id_ficha": id_ficha,
             "archivo": contenido_binario
         })
-        
         db.commit()
-        return {"message": "Foto guardada", "id_ficha": id_ficha}
+
+        nombre_archivo = f"ficha_{id_ficha}_{file.filename}"
+        url_drive = subir_a_drive(nombre_archivo, contenido_binario, file.content_type)
+        
+        return {
+            "message": "Foto guardada en BD y Drive", 
+            "id_ficha": id_ficha,
+            "drive_link": url_drive
+        }
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
