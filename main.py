@@ -14,6 +14,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 
 
 
@@ -46,14 +48,67 @@ def obtener_db():
     finally:
         db.close()
 
+¡Excelente! Ya tienes la "llave maestra". Ahora que has configurada tu cuenta personal como el motor de subida, la API usará tus 2TB y el error de cuota desaparecerá.
+
+Aquí tienes el código final integrado que debes desplegar en Render. He actualizado la función obtener_servicio_drive para que use este nuevo formato y he pulido el endpoint de fotos.
+
+Python
+import decimal
+import os
+import io
+import base64
+import json
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, Response
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional, Dict, Any
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker, Session
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+
+URL_DATABASE = os.getenv("DATABASE_URL")
+DRIVE_FOLDER_ID = os.getenv("DRIVE_FOLDER_ID")
+
+engine = create_engine(
+    URL_DATABASE,
+    pool_recycle=3600,
+    pool_pre_ping=True,
+    isolation_level="READ COMMITTED"
+)
+
+SesionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+app = FastAPI(title="API FICHA CHAGUAL")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+def obtener_db():
+    db = SesionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
 def obtener_servicio_drive():
-    info_json = os.getenv("GOOGLE_SERVICE")
-    if info_json:
-        info = json.loads(info_json)
-        creds = service_account.Credentials.from_service_account_info(info)
-    else:
-        creds = service_account.Credentials.from_service_account_file("GOOGLE_SERVICE")
+    token_json = os.getenv("GOOGLE_TOKEN")
+    if not token_json:
+        raise Exception("Falta la variable de entorno GOOGLE_TOKEN")
+    info = json.loads(token_json)
+    creds = Credentials.from_authorized_user_info(info)
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
     return build('drive', 'v3', credentials=creds)
+
 
 def subir_a_drive(nombre_archivo, contenido_binario, content_type='image/jpeg'):
     try:
@@ -233,12 +288,11 @@ async def crear_foto(
             "archivo": contenido_binario
         })
         db.commit()
-
         nombre_archivo = f"ficha_{id_ficha}_{file.filename}"
         url_drive = subir_a_drive(nombre_archivo, contenido_binario, file.content_type)
         
         return {
-            "message": "Foto guardada en BD y Drive", 
+            "message": "Foto guardada en BD y Drive exitosamente", 
             "id_ficha": id_ficha,
             "drive_link": url_drive
         }

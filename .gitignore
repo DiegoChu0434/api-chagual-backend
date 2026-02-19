@@ -3,3 +3,6 @@ venv/
 *.pyc
 credencial.json
 .env
+echo "credentials.json" >> .gitignore
+echo "token.json" >> .gitignore
+echo ".venv/" >> .gitignore
