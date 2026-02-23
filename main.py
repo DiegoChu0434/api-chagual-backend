@@ -312,15 +312,19 @@ async def subir_audio_ficha(
 
         if len(contenido_binario) == 0:
             return {"message": "El archivo está vacío"}
-
         query = text("UPDATE ficha_chagual SET audio = :contenido WHERE id_ficha = :id")
         db.execute(query, {"contenido": contenido_binario, "id": id_ficha})
         db.commit()
 
+        nombre_audio = f"audio_ficha_{id_ficha}_{file.filename}"
+
+        url_drive = subir_a_drive(nombre_audio, contenido_binario, file.content_type)
+
         return {
             "status": "success",
-            "message": "Audio guardado en la base de datos", 
+            "message": "Audio guardado en BD y Drive exitosamente", 
             "id_ficha": id_ficha,
+            "drive_link": url_drive,
             "bytes": len(contenido_binario)
         }
     except Exception as e:
