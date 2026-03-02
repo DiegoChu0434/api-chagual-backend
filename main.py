@@ -55,7 +55,7 @@ def obtener_servicio_drive():
 
 def obtener_o_crear_carpeta_ficha(id_ficha):
     service = obtener_servicio_drive()
-    nombre_carpeta = f"Ficha_{id_ficha}"
+    nombre_carpeta = f"AC00_{id_ficha}"
     
     query = f"name = '{nombre_carpeta}' and '{DRIVE_FOLDER_ID}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
     respuesta = service.files().list(q=query, fields="files(id)").execute()
